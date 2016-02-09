@@ -3,6 +3,9 @@ package edu.uw.cwc8.geopaint;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.PorterDuff;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.location.Location;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
@@ -15,6 +18,8 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.TextView;
+import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -26,24 +31,34 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.UiSettings;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.Polyline;
+import com.google.android.gms.maps.model.PolylineOptions;
 
 import org.xdty.preference.colorpicker.ColorPickerDialog;
 import org.xdty.preference.colorpicker.ColorPickerSwatch;
+
+import java.util.List;
 
 public class MapsActivity extends AppCompatActivity implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
 
     private static final String TAG = "Map Activity";
 
     private GoogleMap mMap;
-    private Double currentLat;
-    private Double currentLng;
     private UiSettings mUiSettings;
     GoogleApiClient mGoogleApiClient;
-    private static final int LOC_REQUEST_CODE = 1;
+    private Polyline polyline;
+    private Marker currentLocation;
 
+    private Double currentLat;
+    private Double currentLng;
+    private boolean penDown;
     private int mSelectedColor;
+
+    private static final int LOC_REQUEST_CODE = 1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,6 +66,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         setContentView(R.layout.activity_maps);
 
         getSupportActionBar();
+        penDown = false;
 
         mSelectedColor = ContextCompat.getColor(this, R.color.flamingo);
 
@@ -67,7 +83,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                     .addApi(LocationServices.API)
                     .build();
         }
-
     }
 
     @Override
@@ -81,18 +96,41 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     public boolean onOptionsItemSelected(MenuItem item) {
         // Handle item selection
         switch (item.getItemId()) {
-            case R.id.draw:
-                Log.v(TAG, "Select draw");
+            case R.id.pen:
+                Log.v(TAG, "Select Pen");
+                changePenStatus(item);
+                return true;
+            case R.id.picker:
+                Log.v(TAG, "Select Picker");
                 showColorPicker();
                 return true;
             case R.id.share:
-                Log.v(TAG, "Select share");
+                Log.v(TAG, "Select Share");
                 // shareDrawing();
                 return true;
             default:
                 return super.onOptionsItemSelected(item);
         }
     }
+
+    //change the status of the pen (lifted or down)
+    public void changePenStatus(MenuItem item){
+        if(penDown == false) {
+            item.setIcon(R.drawable.ic_draw_end);
+            Toast.makeText(this,
+                    "Start Drawing Mode",
+                    Toast.LENGTH_SHORT).show();
+            penDown = true;
+            polyline = mMap.addPolyline(new PolylineOptions());
+        } else if(penDown == true) {
+            item.setIcon(R.drawable.ic_draw_start);
+            Toast.makeText(this,
+                    "End Drawing Mode",
+                    Toast.LENGTH_SHORT).show();
+            penDown = false;
+        }
+    }
+
 
     //show color picker
     // library from: https://github.com/xdtianyu/ColorPicker
@@ -109,13 +147,14 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             @Override
             public void onColorSelected(int color) {
                 mSelectedColor = color;
+                Log.v(TAG, "The selected color is: " + color);
             }
-
         });
-
+        //Toast.makeText(this,
+        //        "Color selected: " + mSelectedColor,
+        //        Toast.LENGTH_SHORT).show();
         dialog.show(getFragmentManager(), "color_dialog_test");
     }
-
 
     /**
      * Manipulates the map once available.
@@ -130,11 +169,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
         mUiSettings = mMap.getUiSettings();
-
-        // Add a marker in Sydney and move the camera
-        LatLng sydney = new LatLng(-34, 151);
-        mMap.addMarker(new MarkerOptions().position(sydney).title("Marker in Sydney"));
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(sydney));
 
         //enable zoom in
         mUiSettings.setZoomControlsEnabled(true);
@@ -153,42 +187,46 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     /** Helper method for getting location **/
-    public void getLocation(View v) {
+    public LatLng getLocation(View v) {
+        Log.v(TAG, "Getting user location");
+        LatLng latLng = null;
+
         if (mGoogleApiClient != null) {
-            LocationRequest request = new LocationRequest();
-            request.setInterval(10000);
-            request.setFastestInterval(5000);
-            request.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+            try {
+                Location loc = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
+                if (loc != null) {
+                    latLng = new LatLng(loc.getLatitude(), loc.getLongitude());
 
-            //FLA refers to gathering ways of getting location (i.e. GPS, Wi-Fi)
-            //we get the last location from the gathered methods of getting location
-            int permissionCheck = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION);
-            if(permissionCheck == PackageManager.PERMISSION_GRANTED) {
-                //if we have the permission, do the thing
-                LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, request, this);
-            } else {
-                //if the user denies the permission once, you should explain the rationale for the permission next time
-                // see documentation for shouldShowRequestPermissionRationale
-                //if(ActivityCompat.shouldShowRequestPermissionRationale(...))
+                    ((TextView) findViewById(R.id.txtLat)).setText("" + loc.getLatitude());
+                    ((TextView) findViewById(R.id.txtLng)).setText("" + loc.getLongitude());
 
-                //if not, ask for the permission
-                ActivityCompat.requestPermissions(
-                        this,
-                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                        LOC_REQUEST_CODE);
+                    if (currentLocation != null) {
+                        currentLocation.remove();
+                    }
+                    currentLocation = mMap.addMarker(new MarkerOptions()
+                        .position(latLng)
+                        .title("Your Current Location"));
+
+                    Drawable icon = ContextCompat.getDrawable(this, R.drawable.ic_location_marker);
+                    currentLocation.setIcon(BitmapDescriptorFactory.fromBitmap(((BitmapDrawable) icon).getBitmap()));
+                    mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
+                } else {
+                    Log.v(TAG, "Cannot retrieve last location");
+                    Toast.makeText(this,
+                            "Cannot retrieve last location",
+                            Toast.LENGTH_SHORT).show();
+                }
+            } catch (SecurityException e) {
+                Log.v(TAG, "Permission to get location is required");
+                e.printStackTrace();
             }
-            Location loc = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
-
-            // TODO: Do something with loc
-
         }
+        return latLng;
     }
 
     @Override
     public void onConnected(Bundle bundle) {
         //when API has connected
-        getLocation(null);
-
         LocationRequest request = new LocationRequest();
         request.setInterval(10000);
         request.setFastestInterval(5000);
@@ -198,6 +236,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         if(permissionCheck == PackageManager.PERMISSION_GRANTED) {
             //if we have the permission, do the thing
             LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, request, this);
+            getLocation(null);
         } else {
             //if the user denies the permission once, you should explain the rationale for the permission next time
             // see documentation for shouldShowRequestPermissionRationale
@@ -227,16 +266,24 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     @Override
     public void onConnectionSuspended(int i) {
-
+        Log.v(TAG, "Connection Suspended");
     }
 
     @Override
     public void onLocationChanged(Location location) {
-
+        Log.v(TAG, "Location Change");
+        if (penDown) {
+            //get current location and draw line
+            LatLng currentLocation = getLocation(null);
+            List<LatLng> points = polyline.getPoints();
+            points.add(currentLocation);
+            polyline.setPoints(points);
+            polyline.setColor(mSelectedColor);
+        }
     }
 
     @Override
     public void onConnectionFailed(ConnectionResult connectionResult) {
-
+        Log.v(TAG, "Connection Failed");
     }
 }

@@ -2,8 +2,13 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <item android:id="@+id/draw"
-        android:icon="@drawable/ic_draw"
+    <item android:id="@+id/pen"
+        android:icon="@drawable/ic_draw_start"
+        android:title="Use Pen"
+        app:showAsAction="ifRoom"/>
+
+    <item android:id="@+id/picker"
+        android:icon="@drawable/ic_picker"
         android:title="Choose Color"
         app:showAsAction="ifRoom"/>
 

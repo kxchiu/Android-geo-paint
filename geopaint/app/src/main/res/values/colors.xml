@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="colorPrimary">#3F51B5</color>
-    <color name="colorPrimaryDark">#303F9F</color>
+    <color name="colorPrimary">#333333</color>
+    <color name="colorPrimaryDark">#000000</color>
     <color name="colorAccent">#FF4081</color>
 
     <color name="bright_pink">#FF007F</color>
@@ -14,6 +14,8 @@
     <color name="blue">#0000FF</color>
     <color name="violet">#7F00FF</color>
     <color name="magenta">#FF00FF</color>
+    <color name="black">#000000</color>
+    <color name="lightgrey">#333333</color>
 
     <array name="rainbow">
         <item>@color/bright_pink</item>
@@ -26,5 +28,7 @@
         <item>@color/blue</item>
         <item>@color/violet</item>
         <item>@color/magenta</item>
+        <item>@color/black</item>
+        <item>@color/lightgrey</item>
     </array>
 </resources>
