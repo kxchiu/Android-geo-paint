@@ -1,3 +1,10 @@
+package edu.uw.cwc8.geopaint;
+
+import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Polyline;
+
+import java.util.List;
+
 /**
  * Code for converting Polylines into GeoJSON formatted Strings 
  * @author  Kyungmin Lee

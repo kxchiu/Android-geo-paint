@@ -7,6 +7,7 @@ import android.graphics.PorterDuff;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.location.Location;
+import android.os.Environment;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
@@ -41,6 +42,9 @@ import com.google.android.gms.maps.model.PolylineOptions;
 import org.xdty.preference.colorpicker.ColorPickerDialog;
 import org.xdty.preference.colorpicker.ColorPickerSwatch;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.List;
 
 public class MapsActivity extends AppCompatActivity implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
@@ -104,6 +108,10 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 Log.v(TAG, "Select Picker");
                 showColorPicker();
                 return true;
+            case R.id.save:
+                Log.v(TAG, "Select Save");
+                // saveDrawing();
+                return true;
             case R.id.share:
                 Log.v(TAG, "Select Share");
                 // shareDrawing();
@@ -131,7 +139,6 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     }
 
-
     //show color picker
     // library from: https://github.com/xdtianyu/ColorPicker
     public void showColorPicker(){
@@ -154,6 +161,52 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         //        "Color selected: " + mSelectedColor,
         //        Toast.LENGTH_SHORT).show();
         dialog.show(getFragmentManager(), "color_dialog_test");
+    }
+
+    public void saveDrawing(){
+        Log.v(TAG, "Saving the drawing");
+
+        if(isExternalStorageWritable()){
+            try {
+                File dir; //where to save stuff
+                //public external
+                dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+
+                //we can also save stuffs privately using methods so the user cannot see them
+                //dir = Environment.getExternalStorageDirectory(...); //private external
+                //dir = getFilesDir(); //internal file storage
+                //dir = getCacheDir(); //internal cashe
+                //dir = getExternalCacheDir(); //external cache
+
+                //declaring or getting the file
+                File file = new File(dir, "myFile.txt");
+
+                //write to the file
+                FileOutputStream outputStream = new FileOutputStream(file);
+                String message = "Hello file!";
+
+                //we can't write String to FOS, but we can get the bytes
+                outputStream.write(message.getBytes());
+
+                //*****if we are using internal file storage, there's a helper method*****
+                //outputStream = openFileOutput("myFile.txt", MODE_PRIVATE);
+
+                //always make sure you close the stream so no data is leaked
+                outputStream.close();
+                Log.v(TAG, "File written");
+            } catch (IOException ioe) {
+                ioe.printStackTrace();
+            }
+        }
+    }
+
+    /* Checks if external storage is available for read and write */
+    public boolean isExternalStorageWritable() {
+        String state = Environment.getExternalStorageState();
+        if (Environment.MEDIA_MOUNTED.equals(state)) {
+            return true;
+        }
+        return false;
     }
 
     /**

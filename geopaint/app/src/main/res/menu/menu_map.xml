@@ -12,6 +12,11 @@
         android:title="Choose Color"
         app:showAsAction="ifRoom"/>
 
+    <item android:id="@+id/save"
+        android:icon="@drawable/ic_save"
+        android:title="Save Drawing"
+        app:showAsAction="ifRoom" />
+
     <item android:id="@+id/share"
         android:icon="@drawable/ic_share"
         android:title="Share Drawing"
