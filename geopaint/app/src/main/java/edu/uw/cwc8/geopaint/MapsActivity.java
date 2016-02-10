@@ -7,12 +7,16 @@ import android.graphics.PorterDuff;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.location.Location;
+import android.net.Uri;
 import android.os.Environment;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
 import android.support.v4.content.ContextCompat;
+import android.support.v4.view.MenuItemCompat;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.view.menu.ActionMenuItemView;
+import android.support.v7.widget.ShareActionProvider;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.Menu;
@@ -45,6 +49,7 @@ import org.xdty.preference.colorpicker.ColorPickerSwatch;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 public class MapsActivity extends AppCompatActivity implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
@@ -54,11 +59,12 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     private GoogleMap mMap;
     private UiSettings mUiSettings;
     GoogleApiClient mGoogleApiClient;
+    private ShareActionProvider mShareActionProvider;
+
     private Polyline polyline;
+    List<Polyline> lineList;
     private Marker currentLocation;
 
-    private Double currentLat;
-    private Double currentLng;
     private boolean penDown;
     private int mSelectedColor;
 
@@ -71,7 +77,7 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         getSupportActionBar();
         penDown = false;
-
+        lineList = new ArrayList<Polyline>();
         mSelectedColor = ContextCompat.getColor(this, R.color.flamingo);
 
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
@@ -110,11 +116,13 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 return true;
             case R.id.save:
                 Log.v(TAG, "Select Save");
-                // saveDrawing();
+                saveDrawing();
                 return true;
             case R.id.share:
                 Log.v(TAG, "Select Share");
-                // shareDrawing();
+                //instantiate the ShareActionProvider for share
+                mShareActionProvider = (ShareActionProvider) MenuItemCompat.getActionProvider(item);
+                handleShareFile(null);
                 return true;
             default:
                 return super.onOptionsItemSelected(item);
@@ -157,43 +165,34 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 Log.v(TAG, "The selected color is: " + color);
             }
         });
-        //Toast.makeText(this,
-        //        "Color selected: " + mSelectedColor,
-        //        Toast.LENGTH_SHORT).show();
         dialog.show(getFragmentManager(), "color_dialog_test");
     }
 
+    //save the drawing on the map into a .geojson file
     public void saveDrawing(){
         Log.v(TAG, "Saving the drawing");
 
+        if (penDown == true) {
+            lineList.add(polyline);
+        }
+
+        //if we can write to the external storage
         if(isExternalStorageWritable()){
             try {
-                File dir; //where to save stuff
-                //public external
-                dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-
-                //we can also save stuffs privately using methods so the user cannot see them
-                //dir = Environment.getExternalStorageDirectory(...); //private external
-                //dir = getFilesDir(); //internal file storage
-                //dir = getCacheDir(); //internal cashe
-                //dir = getExternalCacheDir(); //external cache
-
-                //declaring or getting the file
-                File file = new File(dir, "myFile.txt");
-
-                //write to the file
+                File file = new File(this.getExternalFilesDir(null), "drawing.geojson");
                 FileOutputStream outputStream = new FileOutputStream(file);
-                String message = "Hello file!";
+                GeoJsonConverter geoJsonConverter = new GeoJsonConverter();
+                String geoJsonString = geoJsonConverter.convertToGeoJson(lineList);
+                outputStream.write(geoJsonString.getBytes());
 
-                //we can't write String to FOS, but we can get the bytes
-                outputStream.write(message.getBytes());
-
-                //*****if we are using internal file storage, there's a helper method*****
-                //outputStream = openFileOutput("myFile.txt", MODE_PRIVATE);
+                Log.v(TAG, geoJsonString);
 
                 //always make sure you close the stream so no data is leaked
                 outputStream.close();
-                Log.v(TAG, "File written");
+                Log.v(TAG, "Drawing Saved");
+                Toast.makeText(this,
+                        "Drawing Saved",
+                        Toast.LENGTH_SHORT).show();
             } catch (IOException ioe) {
                 ioe.printStackTrace();
             }
@@ -207,6 +206,31 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             return true;
         }
         return false;
+    }
+
+    //handles the sharing of the file using the ShareActionProvider
+    public void handleShareFile(View v){
+        Log.v(TAG, "Share button clicked");
+
+
+        Uri fileUri;
+
+        File dir = this.getExternalFilesDir(null);
+        File file = new File(dir, "drawing.geojson");
+
+        fileUri = Uri.fromFile(file);
+        Log.v(TAG, "File is at: " + fileUri);
+
+        //we can share a file by using intent with Extra
+        Intent shareIntent = new Intent(Intent.ACTION_SEND);
+        shareIntent.setType("text/plain"); //set the type of intent
+        shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
+
+        Toast.makeText(this,
+                "Sharing File",
+                Toast.LENGTH_SHORT).show();
+
+        mShareActionProvider.setShareIntent(shareIntent);
     }
 
     /**
@@ -250,9 +274,11 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
                 if (loc != null) {
                     latLng = new LatLng(loc.getLatitude(), loc.getLongitude());
 
+                    //display the user location on the screen
                     ((TextView) findViewById(R.id.txtLat)).setText("" + loc.getLatitude());
                     ((TextView) findViewById(R.id.txtLng)).setText("" + loc.getLongitude());
 
+                    //remove the current marker and add a new one
                     if (currentLocation != null) {
                         currentLocation.remove();
                     }
@@ -332,6 +358,9 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
             points.add(currentLocation);
             polyline.setPoints(points);
             polyline.setColor(mSelectedColor);
+
+            //add the line to the list
+            lineList.add(polyline);
         }
     }
 
